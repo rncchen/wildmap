@@ -1,0 +1,20 @@
+[project]
+name = "wildmap"
+version = "0.1.0"
+description = "台灣野生物即時觀測地圖：整合 iNaturalist、eBird 與 TBN"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28",
+    "fastapi>=0.141",
+    "uvicorn[standard]>=0.34",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["wildmap", "wildmap.sources"]
+
+[tool.setuptools.package-data]
+wildmap = ["schema.sql", "web/*.html"]

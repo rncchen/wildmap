@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+.playwright-mcp/
+*.egg-info/
+build/
+dist/

@@ -1,0 +1,22 @@
+services:
+  wildmap:
+    build: .
+    image: ghcr.io/rncchen/wildmap:latest
+    container_name: wildmap
+    restart: unless-stopped
+    ports:
+      - "8137:8000"
+    volumes:
+      - wildmap-data:/data
+    environment:
+      # 沒有 .env 也能跑，只是不會抓 eBird
+      EBIRD_API_KEY: ${EBIRD_API_KEY:-}
+      EBIRD_REGION: ${EBIRD_REGION:-TW}
+      WILDMAP_INTERVAL_INAT: ${WILDMAP_INTERVAL_INAT:-21600}
+      WILDMAP_INTERVAL_EBIRD: ${WILDMAP_INTERVAL_EBIRD:-43200}
+      WILDMAP_INTERVAL_TBN: ${WILDMAP_INTERVAL_TBN:-2592000}
+      WILDMAP_BACKFILL_DAYS: ${WILDMAP_BACKFILL_DAYS:-180}
+      WILDMAP_USER_AGENT: ${WILDMAP_USER_AGENT:-}
+
+volumes:
+  wildmap-data:

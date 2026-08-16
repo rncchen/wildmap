@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: 安裝
+        run: pip install -e .
+
+      - name: 學名正規化測試
+        run: python tests/test_taxonomy.py
+
+      - name: 建立資料庫結構
+        run: |
+          python -m wildmap init
+          python -m wildmap stats
+
+      - name: API 可建立且路由齊全
+        run: |
+          python - <<'PY'
+          from wildmap.api import create_app
+
+          app = create_app()
+          paths = {r.path for r in app.routes if hasattr(r, "path")}
+          expected = {
+              "/", "/api/status", "/api/summary", "/api/species",
+              "/api/observations", "/api/grid", "/api/alerts",
+              "/api/search", "/api/taxon",
+          }
+          missing = expected - paths
+          assert not missing, f"缺少路由: {missing}"
+          print(f"路由齊全，共 {len(paths)} 條")
+          PY
+
+      - name: 前端 JavaScript 語法檢查
+        run: |
+          python - <<'PY'
+          import pathlib
+          import re
+          import subprocess
+
+          html = pathlib.Path("wildmap/web/index.html").read_text(encoding="utf-8")
+          blocks = re.findall(r"<script>(.*?)</script>", html, re.S)
+          assert blocks, "找不到內嵌的 script 區塊"
+          pathlib.Path("app.js").write_text(blocks[-1], encoding="utf-8")
+          subprocess.run(["node", "--check", "app.js"], check=True)
+          print(f"JavaScript 語法通過，{blocks[-1].count(chr(10))} 行")
+          PY
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: 安裝
+        run: pip install -e .
+
+      # 這裡不打外部 API，只確認服務起得來、頁面與端點回得了應答
+      - name: 起服務並打幾個端點
+        run: |
+          python -m wildmap init
+          python -m wildmap serve --port 8137 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8137/api/status > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8137/ > /dev/null
+          curl -sf "http://127.0.0.1:8137/api/summary?range=1w&scope=all" > /dev/null
+          curl -sf "http://127.0.0.1:8137/api/species?range=1w&scope=all" > /dev/null
+          curl -sf "http://127.0.0.1:8137/api/grid?range=1w&scope=all" > /dev/null
+          curl -sf "http://127.0.0.1:8137/api/search?q=%E9%B7%BA" > /dev/null
+          echo "端點都有回應"

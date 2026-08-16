@@ -1,0 +1,10 @@
+# 倉儲內一律 LF，Windows 簽出時再轉，免得 Linux 容器拿到 CRLF
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.db binary
+
+# shell 腳本一定要 LF，CRLF 會讓容器內的 shebang 解析失敗
+*.sh text eol=lf
+docker-entrypoint.sh text eol=lf

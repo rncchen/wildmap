@@ -1,0 +1,1209 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>野圖・台灣野生物即時觀測</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;900&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  /*
+   * 視覺沿用 animal-island-ui 的設計規範（CC BY-NC 4.0，非商業使用）
+   * https://github.com/guokaigdg/animal-island-ui
+   * 這裡是純 HTML 的獨立實作，照它文件給的變數表重寫，未使用其程式碼。
+   */
+  :root {
+    --animal-font: Nunito, "Noto Sans TC", "Microsoft JhengHei", -apple-system, sans-serif;
+
+    --animal-primary: #19c8b9;
+    --animal-primary-hover: #3dd4c6;
+    --animal-primary-active: #11a89b;
+    --animal-primary-bg: #e6f9f6;
+
+    --animal-text: #794f27;
+    --animal-text-body: #725d42;
+    --animal-text-secondary: #9f927d;
+    --animal-text-muted: #8a7b66;
+
+    --animal-bg: #f8f8f0;
+    --animal-bg-content: rgb(247, 243, 223);
+
+    --animal-border: #c4b89e;
+    --animal-border-hover: #a89878;
+
+    --animal-radius-sm: 12px;
+    --animal-radius: 18px;
+    --animal-radius-lg: 24px;
+    --animal-radius-pill: 50px;
+
+    --animal-shadow-btn: #bdaea0;
+    --animal-shadow-input: #d4c9b4;
+    --animal-soft: 0 2px 4px 0 rgba(61, 52, 40, .06);
+    --animal-soft-lg: 0 3px 10px rgba(61, 52, 40, .12);
+
+    --animal-focus-yellow: #ffcc00;
+    --animal-success: #6fba2c;
+    --animal-warning: #f5c31c;
+    --animal-error: #e05a5a;
+
+    --animal-ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --animal-duration: 0.25s;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; flex-direction: column;
+    font-family: var(--animal-font);
+    font-size: 18px; line-height: 1.7; font-weight: 500;
+    background: var(--animal-bg); color: var(--animal-text-body);
+  }
+
+  /* ---------- 頂列 ---------- */
+  header {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 12px 18px; background: var(--animal-bg-content);
+    border-bottom: 2px solid var(--animal-border); z-index: 1000;
+  }
+  header h1 {
+    font-size: 23px; margin: 0; font-weight: 900; color: var(--animal-text);
+    letter-spacing: .02em; display: flex; align-items: baseline; gap: 9px;
+  }
+  header h1 span {
+    font-size: 16px; font-weight: 700; color: var(--animal-text-muted);
+    letter-spacing: 0;
+  }
+  .group { display: flex; align-items: center; gap: 7px; }
+  .group > .label {
+    color: var(--animal-text-muted); font-size: 16px; font-weight: 700;
+  }
+
+  button.seg {
+    padding: 7px 16px; border: 2px solid var(--animal-border);
+    background: #fff; color: var(--animal-text-muted);
+    border-radius: var(--animal-radius-pill); cursor: pointer;
+    font-family: inherit; font-size: 17px; font-weight: 700;
+    box-shadow: var(--animal-soft);
+    transition: all var(--animal-duration) var(--animal-ease);
+  }
+  button.seg:hover {
+    color: var(--animal-text); border-color: var(--animal-border-hover);
+    transform: translateY(-1px);
+  }
+  button.seg.on {
+    background: var(--animal-primary); border-color: var(--animal-primary-active);
+    color: #fff; box-shadow: 0 4px 0 0 var(--animal-shadow-btn);
+  }
+  button.seg.on:hover {
+    background: var(--animal-primary-hover); transform: translateY(-2px);
+    box-shadow: 0 6px 0 0 var(--animal-shadow-btn);
+  }
+  button.seg.on:active {
+    transform: translateY(2px); box-shadow: 0 2px 0 0 var(--animal-shadow-btn);
+  }
+
+  /* ---------- 篩選輸入 ---------- */
+  #filter { position: relative; margin-left: auto; }
+  #filter input {
+    width: 250px; padding: 8px 44px 8px 16px;
+    font-family: inherit; font-size: 17px; font-weight: 500;
+    background: #fff; color: var(--animal-text);
+    border: 2px solid var(--animal-border); border-radius: var(--animal-radius-pill);
+    transition: all var(--animal-duration) var(--animal-ease);
+  }
+  #filter input::placeholder { color: var(--animal-text-secondary); font-weight: 400; }
+  #filter input:focus {
+    outline: 2px solid var(--animal-focus-yellow); outline-offset: 1px;
+    border-color: var(--animal-border-hover);
+  }
+  /* 疊在輸入框裡面，不佔版位，出現時才不會把輸入框往旁邊擠 */
+  #clear-filter {
+    position: absolute; right: 7px; top: 50%;
+    width: 27px; height: 27px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--animal-bg-content); color: var(--animal-text-muted);
+    border: 2px solid var(--animal-border); border-radius: 50%;
+    font-family: inherit; font-size: 19px; font-weight: 700; line-height: 1;
+    cursor: pointer; box-shadow: var(--animal-soft);
+    opacity: 0; pointer-events: none;
+    transform: translateY(-50%) scale(.6);
+    transition: opacity var(--animal-duration) var(--animal-ease),
+                transform var(--animal-duration) var(--animal-ease),
+                background var(--animal-duration) var(--animal-ease),
+                color var(--animal-duration) var(--animal-ease);
+  }
+  #clear-filter.on {
+    opacity: 1; pointer-events: auto; transform: translateY(-50%) scale(1);
+  }
+  #clear-filter:hover {
+    background: var(--animal-error); border-color: #c04a4a; color: #fff;
+    transform: translateY(-50%) scale(1.1);
+  }
+  #clear-filter:active { transform: translateY(-50%) scale(.94); }
+
+  /* ---------- 主要版面 ---------- */
+  main { flex: 1; display: flex; min-height: 0; }
+  #map { flex: 1; background: var(--animal-bg-content); }
+  aside {
+    width: 350px; background: var(--animal-bg-content);
+    border-left: 2px solid var(--animal-border);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+
+  .stats { display: flex; gap: 10px; padding: 12px 12px 4px; }
+  .stats div {
+    flex: 1; padding: 9px 6px; background: #fff; text-align: center;
+    border: 2px solid var(--animal-border); border-radius: var(--animal-radius);
+  }
+  .stats b {
+    display: block; font-size: 26px; font-weight: 900; color: var(--animal-text);
+    font-variant-numeric: tabular-nums; line-height: 1.3;
+  }
+  .stats span { color: var(--animal-text-muted); font-size: 15px; font-weight: 700; }
+
+  /* 分頁做成實體頁籤，選中的那片浮起來並與內容區連成一塊 */
+  .tabs { display: flex; gap: 8px; padding: 12px 12px 0; }
+  .tabs button {
+    flex: 1; padding: 10px 0; font-family: inherit; font-size: 18px; font-weight: 700;
+    color: var(--animal-text-muted); cursor: pointer;
+    background: #fff; border: 2px solid var(--animal-border);
+    border-radius: var(--animal-radius) var(--animal-radius) 0 0;
+    border-bottom: none; position: relative; top: 2px;
+    transition: all var(--animal-duration) var(--animal-ease);
+  }
+  .tabs button:hover { color: var(--animal-text); background: var(--animal-primary-bg); }
+  .tabs button.on {
+    background: var(--animal-primary); border-color: var(--animal-primary-active);
+    color: #fff; top: 0; padding-bottom: 11px;
+  }
+
+  .list {
+    flex: 1; overflow-y: auto; min-height: 0; margin: 0 12px 12px;
+    background: #fff; border: 2px solid var(--animal-border);
+    border-radius: 0 0 var(--animal-radius) var(--animal-radius);
+  }
+  .row {
+    padding: 11px 14px; border-bottom: 1.5px solid #ece4d2; cursor: pointer;
+    transition: background var(--animal-duration) var(--animal-ease);
+  }
+  .row:last-child { border-bottom: none; }
+  .row:hover { background: var(--animal-primary-bg); }
+  .row.on { background: var(--animal-primary-bg); box-shadow: inset 4px 0 0 var(--animal-primary); }
+  .row .zh { font-weight: 700; font-size: 18px; color: var(--animal-text); }
+  .row .meta { color: var(--animal-text-secondary); font-size: 15px; margin-top: 3px; }
+  .row .n {
+    float: right; color: var(--animal-primary-active); font-weight: 900; font-size: 19px;
+    font-variant-numeric: tabular-nums;
+  }
+  .sci {
+    color: var(--animal-text-secondary); font-style: italic;
+    font-size: 15px; font-weight: 500;
+  }
+
+  .tag {
+    display: inline-block; padding: 1px 9px; border-radius: var(--animal-radius-pill);
+    font-size: 13.5px; font-weight: 700; margin-right: 5px; vertical-align: 1px;
+  }
+  .tag.p1 { background: #fbdcdc; color: #b03636; }
+  .tag.p2 { background: #fdefd0; color: #96631a; }
+  .tag.p3 { background: #ddeedf; color: #3f7a4a; }
+  .tag.red { background: #f7e2ef; color: #96276f; }
+  .tag.new { background: #d9f3ef; color: #11837a; }
+  .tag.alien { background: #f0e7cd; color: #7d6520; }
+
+  .hint {
+    padding: 18px 14px; color: var(--animal-text-muted);
+    font-size: 16px; line-height: 1.9; text-align: center;
+  }
+
+  #freshness {
+    padding: 9px 14px; margin: 0 12px 12px; background: #fff;
+    border: 2px solid var(--animal-border); border-radius: var(--animal-radius);
+    color: var(--animal-text-muted); font-size: 14.5px; line-height: 1.6;
+  }
+  #freshness b { color: var(--animal-primary-active); font-weight: 700; }
+
+  #credits {
+    padding: 0 14px 14px; color: var(--animal-text-secondary);
+    font-size: 12.5px; line-height: 1.7;
+  }
+  #credits a { color: var(--animal-text-muted); }
+
+  /* ---------- 地圖上的元件 ---------- */
+  .leaflet-tooltip.obs-tip {
+    background: var(--animal-bg-content); color: var(--animal-text);
+    border: 2px solid var(--animal-border); border-radius: var(--animal-radius-sm);
+    box-shadow: var(--animal-soft); font-size: 16px; font-weight: 700;
+    padding: 5px 11px; font-family: var(--animal-font);
+  }
+  .leaflet-tooltip.obs-tip::before { border-top-color: var(--animal-border); }
+  .leaflet-tooltip.obs-tip .sci { display: block; font-weight: 500; }
+
+  /* Leaflet 預設的 30px 方鈕在這個字級下太小，放大到兩倍多 */
+  .leaflet-bar {
+    border: none !important; box-shadow: none !important;
+    display: flex; flex-direction: column; gap: 7px;
+  }
+  .leaflet-bar a, .leaflet-bar a:first-child, .leaflet-bar a:last-child {
+    width: 64px; height: 64px; line-height: 60px;
+    color: var(--animal-text); background: var(--animal-bg-content);
+    font-family: var(--animal-font); font-weight: 700; font-size: 32px;
+    border: 2px solid var(--animal-border) !important;
+    border-radius: var(--animal-radius) !important;
+    box-shadow: 0 4px 0 0 var(--animal-shadow-btn);
+    transition: all var(--animal-duration) var(--animal-ease);
+  }
+  .leaflet-bar a:hover {
+    background: var(--animal-primary-bg); border-color: var(--animal-border-hover) !important;
+    transform: translateY(-2px); box-shadow: 0 6px 0 0 var(--animal-shadow-btn);
+  }
+  .leaflet-bar a:active {
+    transform: translateY(2px); box-shadow: 0 2px 0 0 var(--animal-shadow-btn);
+  }
+  .leaflet-bar a.icon-btn {
+    display: flex; align-items: center; justify-content: center;
+  }
+  .leaflet-bar a.icon-btn svg { width: 34px; height: 34px; display: block; }
+  .leaflet-bar a.icon-btn.busy svg { animation: spin 1.1s linear infinite; }
+  .leaflet-bar a.icon-btn.located { color: var(--animal-primary-active); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .leaflet-control-scale-line {
+    border: 2px solid var(--animal-border); border-top: none;
+    background: rgba(247, 243, 223, .85); color: var(--animal-text);
+    font-family: var(--animal-font); font-weight: 700; font-size: 14px;
+    border-radius: 0 0 var(--animal-radius-sm) var(--animal-radius-sm);
+  }
+  .leaflet-control-attribution {
+    background: rgba(247, 243, 223, .85) !important; color: var(--animal-text-muted);
+    font-family: var(--animal-font); border-radius: var(--animal-radius-sm) 0 0 0;
+  }
+
+  #zoomhint {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 900;
+    background: var(--animal-bg-content); border: 2px solid var(--animal-border);
+    border-radius: var(--animal-radius-pill); padding: 6px 18px;
+    font-size: 16px; font-weight: 700; color: var(--animal-text-muted);
+    pointer-events: none; box-shadow: var(--animal-soft);
+  }
+
+  /* ---------- 地圖標記 ----------
+     用 divIcon 而非向量圓點，才放得下重疊筆數，也才能用 CSS 做描邊與光環 */
+  /* 尺寸由 divIcon 的 iconSize 決定，這裡填滿容器就好。
+     用負 margin 溢出 0x0 容器的話，Leaflet 算出來的點擊區域是空的，
+     標記會互相擋住點不到 */
+  .pin {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; height: 100%; box-sizing: border-box;
+    border: 2.5px solid #6b4620; border-radius: 50%;
+    background: #19c8b9; color: #fff;
+    font-family: var(--animal-font); font-weight: 900; font-size: 13px;
+    box-shadow: 0 1px 3px rgba(40, 30, 20, .35);
+    transition: transform var(--animal-duration) var(--animal-ease);
+  }
+  .pin:hover { transform: scale(1.2); }
+  .pin.protected { background: var(--animal-error); }
+  .pin.obscured { border-style: dashed; }
+  .pin.multi { font-size: 15px; }
+  .pin.multi.wide { font-size: 16px; }
+  .pin.picked {
+    box-shadow: 0 0 0 6px rgba(255, 204, 0, .45), 0 0 0 8.5px #e0b800,
+                0 2px 5px rgba(40, 30, 20, .4);
+  }
+
+  /* ---------- 資訊卡（置中面板，取代地圖上的小氣泡）---------- */
+  #card {
+    position: fixed; inset: 0; z-index: 3000; display: none;
+    background: rgba(60, 48, 34, .74); align-items: center; justify-content: center;
+    padding: 28px;
+  }
+  #card.on { display: flex; animation: fade .2s var(--animal-ease); }
+  @keyframes fade { from { opacity: 0; } }
+
+  .card-box {
+    position: relative; display: flex; flex-direction: column;
+    width: min(720px, 94vw); max-height: 88vh; overflow: hidden;
+    background: var(--animal-bg-content);
+    border: 3px solid var(--animal-border); border-radius: var(--animal-radius-lg);
+    box-shadow: 0 12px 40px rgba(40, 30, 20, .45);
+    animation: pop .25s var(--animal-ease);
+  }
+  @keyframes pop { from { transform: scale(.94); opacity: 0; } }
+
+  .card-photo {
+    width: 100%; max-height: 52vh; object-fit: contain; display: block;
+    flex: 0 0 auto;
+    background: #ded5bd; border-bottom: 3px solid var(--animal-border);
+  }
+  /* display 寫死會蓋掉 hidden 屬性，沒照片時就會露出破圖 */
+  .card-photo[hidden] { display: none; }
+  .card-body { padding: 18px 24px 22px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+  .card-title {
+    font-size: 27px; font-weight: 900; color: var(--animal-text); line-height: 1.35;
+  }
+  .card-sci {
+    font-style: italic; font-size: 18px; font-weight: 500;
+    color: var(--animal-text-secondary); margin-top: 2px;
+  }
+  .card-rows { margin-top: 14px; display: grid; gap: 7px; }
+  .card-rows div { display: flex; gap: 12px; font-size: 17px; }
+  .card-rows dt {
+    flex: 0 0 74px; color: var(--animal-text-muted); font-weight: 700; margin: 0;
+  }
+  .card-rows dd { margin: 0; color: var(--animal-text-body); font-weight: 500; }
+  .card-body a { color: var(--animal-primary-active); font-weight: 700; }
+  .card-tags { margin-bottom: 8px; }
+
+  /* 同一處多筆觀測時，面板先列清單 */
+  .card-list { margin-top: 14px; display: grid; gap: 8px; }
+  .card-item {
+    display: flex; align-items: center; gap: 12px; padding: 8px 10px;
+    background: #fff; border: 2px solid var(--animal-border);
+    border-radius: var(--animal-radius-sm); cursor: pointer; text-align: left;
+    font-family: inherit; font-size: 17px; width: 100%;
+    transition: all var(--animal-duration) var(--animal-ease);
+  }
+  .card-item:hover {
+    background: var(--animal-primary-bg); border-color: var(--animal-border-hover);
+    transform: translateX(3px);
+  }
+  .card-item img {
+    width: 52px; height: 52px; object-fit: cover; flex: 0 0 52px;
+    border-radius: 9px; border: 2px solid var(--animal-border); background: #ded5bd;
+  }
+  .card-item .noimg {
+    width: 52px; height: 52px; flex: 0 0 52px; border-radius: 9px;
+    border: 2px dashed var(--animal-border); background: var(--animal-bg);
+  }
+  .card-item .name { font-weight: 700; color: var(--animal-text); }
+  .card-item .when { color: var(--animal-text-secondary); font-size: 14.5px; }
+  .card-back {
+    margin-bottom: 12px; padding: 5px 16px; cursor: pointer;
+    background: #fff; border: 2px solid var(--animal-border);
+    border-radius: var(--animal-radius-pill);
+    font-family: inherit; font-size: 15px; font-weight: 700; color: var(--animal-text-muted);
+    box-shadow: var(--animal-soft);
+  }
+  .card-back:hover { color: var(--animal-text); border-color: var(--animal-border-hover); }
+
+  .card-lock, .card-goto {
+    padding: 9px 18px; cursor: pointer; font-family: inherit;
+    font-size: 16px; font-weight: 700; color: #fff;
+    background: var(--animal-primary); border: 2px solid var(--animal-primary-active);
+    border-radius: var(--animal-radius-pill);
+    box-shadow: 0 4px 0 0 var(--animal-shadow-btn);
+    transition: all var(--animal-duration) var(--animal-ease);
+  }
+  .card-lock:hover, .card-goto:hover {
+    background: var(--animal-primary-hover);
+    transform: translateY(-2px); box-shadow: 0 6px 0 0 var(--animal-shadow-btn);
+  }
+  .card-lock:active, .card-goto:active {
+    transform: translateY(2px); box-shadow: 0 2px 0 0 var(--animal-shadow-btn);
+  }
+
+  .card-close {
+    position: absolute; top: 12px; right: 14px; width: 42px; height: 42px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--animal-bg-content); border: 2px solid var(--animal-border);
+    border-radius: 50%; color: var(--animal-text); font-size: 26px;
+    font-family: inherit; font-weight: 700; line-height: 1; cursor: pointer;
+    box-shadow: 0 4px 0 0 var(--animal-shadow-btn);
+    transition: all var(--animal-duration) var(--animal-ease);
+  }
+  .card-close:hover { background: var(--animal-error); border-color: #c04a4a; color: #fff; }
+  .card-close:active { transform: translateY(2px); box-shadow: 0 2px 0 0 var(--animal-shadow-btn); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>野圖<span>台灣野生物即時觀測</span></h1>
+  <div class="group" id="range">
+    <span class="label">期間</span>
+    <button class="seg" data-v="3d">3 天</button>
+    <button class="seg" data-v="1w">1 週</button>
+    <button class="seg on" data-v="1m">1 個月</button>
+    <button class="seg" data-v="3m">3 個月</button>
+    <button class="seg" data-v="6m">半年</button>
+  </div>
+  <div class="group" id="scope">
+    <span class="label">範圍</span>
+    <button class="seg on" data-v="all">全部</button>
+    <button class="seg" data-v="protected">保育類</button>
+    <button class="seg" data-v="birds">鳥類</button>
+  </div>
+  <div id="filter">
+    <input id="q" type="text" placeholder="篩選中文名或學名" autocomplete="off">
+    <button id="clear-filter" type="button" title="清除篩選" aria-label="清除篩選">×</button>
+  </div>
+</header>
+
+<main>
+  <div id="map"><div id="zoomhint"></div></div>
+  <aside>
+    <div class="stats">
+      <div><b id="s-obs">－</b><span>觀測筆數</span></div>
+      <div><b id="s-spp">－</b><span>物種數</span></div>
+      <div><b id="s-alert">－</b><span>警示</span></div>
+    </div>
+    <div class="tabs">
+      <button class="on" data-tab="species">物種</button>
+      <button data-tab="alerts">警示</button>
+    </div>
+    <div class="list" id="panel"></div>
+    <div id="freshness">資料狀態載入中</div>
+    <div id="credits">
+      觀測資料來自
+      <a href="https://www.inaturalist.org/" target="_blank" rel="noopener">iNaturalist</a>
+      與 <a href="https://ebird.org/" target="_blank" rel="noopener">eBird</a>，
+      物種與保育資訊來自
+      <a href="https://www.tbn.org.tw/" target="_blank" rel="noopener">TBN 台灣生物多樣性網絡</a>。
+      各筆觀測與照片的授權以資訊卡標示為準，僅供非商業使用。
+    </div>
+  </aside>
+</main>
+
+<div id="card">
+  <div class="card-box">
+    <button class="card-close" type="button" title="關閉" aria-label="關閉">×</button>
+    <img class="card-photo" alt="" hidden>
+    <div class="card-body"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const state = {
+  range: "1m", scope: "all",
+  tab: "species", q: "", taxon: null,
+};
+const POINT_ZOOM = 11;   // 到這個層級才改用個別點位，再遠就用聚合
+
+// 地圖上所有圖形都用同一個深棕描邊，靠填色分類別。各自描邊會互相打架，
+// 統一描邊才有動森那種「每個物件都描一圈深色」的感覺
+const STROKE = "#6b4620";
+
+// 國土測繪中心的臺灣電子地圖。免註冊公開提供，地名是中文，
+// 公園與步道標得比國外圖資完整。WMTS 的路徑順序是 {z}/{y}/{x}
+const BASEMAP = {
+  url: "https://wmts.nlsc.gov.tw/wmts/EMAP/default/GoogleMapsCompatible/{z}/{y}/{x}",
+  attribution:
+    '圖資 &copy; <a href="https://maps.nlsc.gov.tw/" target="_blank" rel="noopener">內政部國土測繪中心</a>',
+  maxZoom: 19,
+};
+
+const map = L.map("map", { zoomControl: true }).setView([23.7, 121.0], 8);
+L.tileLayer(BASEMAP.url, {
+  attribution: BASEMAP.attribution,
+  maxZoom: BASEMAP.maxZoom,
+}).addTo(map);
+
+const pointLayer = L.layerGroup().addTo(map);
+const gridLayer = L.layerGroup().addTo(map);
+const meLayer = L.layerGroup().addTo(map);
+
+L.control.scale({ imperial: false, metric: true, maxWidth: 140 }).addTo(map);
+
+// 定位按鈕。準星圖示在定位中會轉，定位成功後維持強調色
+const ICON_CROSSHAIR = `
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+       stroke-linecap="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="7"/>
+    <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/>
+    <line x1="12" y1="1.5" x2="12" y2="5"/>
+    <line x1="12" y1="19" x2="12" y2="22.5"/>
+    <line x1="1.5" y1="12" x2="5" y2="12"/>
+    <line x1="19" y1="12" x2="22.5" y2="12"/>
+  </svg>`;
+
+const LocateControl = L.Control.extend({
+  options: { position: "topleft" },
+  onAdd() {
+    const wrap = L.DomUtil.create("div", "leaflet-bar");
+    const btn = L.DomUtil.create("a", "icon-btn", wrap);
+    btn.href = "#";
+    btn.title = "定位到我的位置";
+    btn.innerHTML = ICON_CROSSHAIR;
+    L.DomEvent.on(btn, "click", L.DomEvent.stop).on(btn, "click", () => locateMe(btn));
+    return wrap;
+  },
+});
+map.addControl(new LocateControl());
+
+function locateMe(btn) {
+  if (!navigator.geolocation) { hint("這個瀏覽器不支援定位"); return; }
+  btn.classList.add("busy");
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      btn.classList.remove("busy");
+      btn.classList.add("located");
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+      meLayer.clearLayers();
+      L.circle([lat, lng], {
+        radius: accuracy, color: STROKE, weight: 2, opacity: 0.5,
+        fillColor: "#8ec63f", fillOpacity: 0.14,
+      }).addTo(meLayer);
+      // 自己的位置用草綠，跟觀測的薄荷綠、保育的紅都分得開
+      L.circleMarker([lat, lng], {
+        radius: 8, color: STROKE, weight: 3,
+        fillColor: "#8ec63f", fillOpacity: 1,
+      }).bindTooltip("我的位置", { className: "obs-tip" }).addTo(meLayer);
+      map.setView([lat, lng], Math.max(map.getZoom(), 13));
+    },
+    err => {
+      btn.classList.remove("busy");
+      const reasons = {
+        1: "定位權限被拒絕，請在網址列左側允許存取位置",
+        2: "取得不到位置資訊",
+        3: "定位逾時",
+      };
+      hint(reasons[err.code] || "定位失敗");
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+  );
+}
+
+const isWide = () => map.getZoom() < POINT_ZOOM;
+
+/* ---------- 資訊卡 ----------
+   地圖上的小氣泡受地圖邊界限制，照片一大就會被上緣切掉，所以改成置中面板。
+   照片直接以大圖呈現，原本另開的照片光箱就不需要了。 */
+const cardEl = document.getElementById("card");
+const cardPhoto = cardEl.querySelector(".card-photo");
+const cardBody = cardEl.querySelector(".card-body");
+
+function openCard({ photo, alt, html }) {
+  if (photo) {
+    cardPhoto.src = photo;
+    cardPhoto.alt = alt || "";
+    cardPhoto.hidden = false;
+  } else {
+    cardPhoto.hidden = true;
+    cardPhoto.removeAttribute("src");
+  }
+  cardBody.innerHTML = html;
+  cardEl.classList.add("on");
+}
+
+function closeCard() {
+  cardEl.classList.remove("on");
+  cardPhoto.removeAttribute("src");
+}
+
+// 只認遮罩本身，不能用 closest 往上找。點清單項目時內容會先被換掉，
+// 等事件冒泡到這裡，被點的元素已經不在 DOM 上，closest 會回傳 null，
+// 於是剛開的卡片馬上被自己關掉
+cardEl.addEventListener("click", e => {
+  if (e.target === cardEl) closeCard();
+});
+cardEl.querySelector(".card-close").addEventListener("click", closeCard);
+
+function row(label, value) {
+  return value ? `<div><dt>${label}</dt><dd>${value}</dd></div>` : "";
+}
+
+// 清單縮圖只有 52px，卻載 medium 尺寸的圖，等半天才出來。
+// iNat 同一組網址換個檔名就有方形小圖
+function thumb(url) {
+  return url ? url.replace("/medium.", "/square.") : url;
+}
+
+const LICENSE_LABEL = {
+  cc0: "CC0 公眾領域",
+  "cc-by": "CC BY",
+  "cc-by-nc": "CC BY-NC",
+  "cc-by-sa": "CC BY-SA",
+  "cc-by-nd": "CC BY-ND",
+  "cc-by-nc-sa": "CC BY-NC-SA",
+  "cc-by-nc-nd": "CC BY-NC-ND",
+  eBird: "eBird，康乃爾鳥類學研究室",
+};
+
+function licenseLabel(code) {
+  if (!code) return "作者保留所有權利";
+  return LICENSE_LABEL[code] || code;
+}
+
+// eBird 的條款要求標示來源並連回 eBird.org
+function sourceLink(p) {
+  if (!p.source_url) return null;
+  const name = p.source === "ebird" ? "eBird 檢核表" : "iNaturalist 觀測紀錄";
+  return `<a href="${p.source_url}" target="_blank" rel="noopener">${name}</a>`;
+}
+
+function tagsFor(p) {
+  let html = "";
+  const s = p.protected_status_tw || "";
+  if (s.includes("瀕臨絕種")) html += '<span class="tag p1">瀕臨絕種</span>';
+  else if (s.includes("珍貴稀有")) html += '<span class="tag p2">珍貴稀有</span>';
+  else if (s.includes("應予保育")) html += '<span class="tag p3">應予保育</span>';
+  const r = p.redlist_tw || "";
+  for (const lv of ["極危", "瀕危", "易危", "接近受脅"]) {
+    if (r.startsWith(lv)) { html += `<span class="tag red">${lv}</span>`; break; }
+  }
+  return html;
+}
+
+// 篩選條件是全域的，每個端點都吃同一組
+function queryParams(extra) {
+  return {
+    range: state.range, scope: state.scope,
+    q: state.q || null,
+    taxon_key: state.taxon ? state.taxon.taxon_key : null,
+    ...extra,
+  };
+}
+
+async function api(path, params) {
+  const url = new URL(path, location.origin);
+  Object.entries(params || {}).forEach(([k, v]) => {
+    if (v !== null && v !== undefined && v !== "") url.searchParams.set(k, v);
+  });
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(await resp.text());
+  return resp.json();
+}
+
+// 計數差距常有數十倍，線性上色會讓多數網格擠在同一色階
+function heatColor(n, max) {
+  const t = Math.log(n + 1) / Math.log(max + 1);
+  const stops = ["#a8ddd7", "#5cc4ba", "#19c8b9", "#f5c31c", "#e89b3c", "#e05a5a"];
+  return stops[Math.min(stops.length - 1, Math.floor(t * stops.length))];
+}
+
+// 網格也記最後點過的那格。格子不能像圓點那樣放大，改用焦點黃描邊加粗
+const cellCache = new Map();
+let pickedCell = null;
+
+// 熱區色階本身就含黃色，選中再用黃邊會被當成另一個熱度級距，
+// 所以網格改用深棕加粗描邊
+function cellStyle(color, picked) {
+  return {
+    color: STROKE,
+    weight: picked ? 4 : 1,
+    opacity: picked ? 1 : 0.55,
+    fillColor: color,
+    fillOpacity: picked ? 0.8 : 0.55,
+  };
+}
+
+function markPickedCell(key) {
+  if (pickedCell === key) return;
+
+  const prev = cellCache.get(pickedCell);
+  if (prev) prev.layer.setStyle(cellStyle(prev.color, false));
+
+  pickedCell = key;
+  const next = cellCache.get(key);
+  if (next) {
+    next.layer.setStyle(cellStyle(next.color, true));
+    next.layer.bringToFront();
+  }
+}
+
+async function refreshWide() {
+  gridLayer.clearLayers();
+  cellCache.clear();
+  if (!isWide()) return;
+
+  // 全台縮圖時用粗網格，格子太多前端畫不動
+  const z = map.getZoom();
+  const data = await api("/api/grid", queryParams({
+    size: z <= 8 ? 0.1 : (z <= 9 ? 0.05 : 0.02),
+  }));
+  const half = data.size / 2;
+  for (const c of data.cells) {
+    const color = heatColor(c.n, data.max);
+    const key = `${c.lat.toFixed(4)},${c.lng.toFixed(4)}`;
+    const rect = L.rectangle(
+      [[c.lat - half, c.lng - half], [c.lat + half, c.lng + half]],
+      cellStyle(color, key === pickedCell)
+    );
+    cellCache.set(key, { layer: rect, color });
+
+    rect
+      .bindTooltip(
+        `${c.n} 筆　${c.species} 種${c.protected_n ? `<br>保育類 ${c.protected_n} 筆` : ""}`,
+        { className: "obs-tip", direction: "top" }
+      )
+      .on("click", () => {
+        markPickedCell(key);
+        openCard({
+          html: `
+            <div class="card-title">${c.n.toLocaleString()} 筆觀測</div>
+            <div class="card-sci">這格範圍約 ${Math.round(data.size * 111)} 公里見方</div>
+            <dl class="card-rows">
+              ${row("物種數", `${c.species} 種`)}
+              ${row("保育類", c.protected_n ? `${c.protected_n} 筆` : "")}
+              ${row("最近紀錄", c.last_seen || "－")}
+            </dl>`,
+        });
+      })
+      .addTo(gridLayer);
+    if (key === pickedCell) rect.bringToFront();
+  }
+  hint(`本地網格 ${data.cells.length} 格，最高 ${data.max} 筆`);
+}
+
+// 地圖一移動就重建全部標記的話，開著的資訊卡會跟著被清掉，看起來就像
+// 「拖一下就關了」。改成快取，只增減真正有變化的標記。
+const markerCache = new Map();
+
+// 最後點過的那一群。面板關掉之後還要看得出剛才點的是哪個，
+// 所以標示留在地圖上，不隨面板收起
+let pickedKey = null;
+
+// 視覺上重疊到這個像素距離內的觀測算同一處。用 map.project 取絕對像素，
+// 同一個 zoom 下不會因為平移而改變分組
+const CLUSTER_PX = 26;
+
+function clusterKey(lat, lng, zoom) {
+  const pt = map.project([lat, lng], zoom);
+  return `${Math.floor(pt.x / CLUSTER_PX)}_${Math.floor(pt.y / CLUSTER_PX)}`;
+}
+
+function pinSize(n) {
+  return n > 99 ? 40 : n > 1 ? 32 : 20;
+}
+
+function pinIcon(group, picked) {
+  const n = group.items.length;
+  // 一群裡只要有保育類就用紅的，免得被一般種蓋過去看不出來
+  const isProtected = group.items.some(p => p.protected_status_tw);
+  const cls = ["pin"];
+  if (isProtected) cls.push("protected");
+  if (group.items.every(p => p.obscured)) cls.push("obscured");
+  if (n > 1) cls.push("multi");
+  if (n > 99) cls.push("wide");
+  if (picked) cls.push("picked");
+
+  const size = pinSize(n);
+  return L.divIcon({
+    className: "",
+    html: `<div class="${cls.join(" ")}">${n > 1 ? n : ""}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
+function markPicked(key) {
+  if (pickedKey === key) return;
+
+  const prev = markerCache.get(pickedKey);
+  if (prev) prev.marker.setIcon(pinIcon(prev.group, false));
+
+  pickedKey = key;
+  const next = markerCache.get(key);
+  if (next) next.marker.setIcon(pinIcon(next.group, true));
+}
+
+// 從資訊卡跳到地圖時，目標標記還沒建立，先記下來等點位重繪完再標示
+let pendingFocus = null;
+
+function focusObservation(p) {
+  if (p.lat == null) return;
+  pendingFocus = { lat: p.lat, lng: p.lng };
+  closeCard();
+  map.setView([p.lat, p.lng], Math.max(map.getZoom(), POINT_ZOOM + 2));
+  // 若地圖本來就在這個位置，moveend 不會觸發，得自己補一次
+  refreshPoints();
+}
+
+function applyPendingFocus() {
+  if (!pendingFocus) return;
+  const key = clusterKey(pendingFocus.lat, pendingFocus.lng, map.getZoom());
+  if (!markerCache.has(key)) return;
+  pendingFocus = null;
+  pickedKey = null;   // 強制重畫，否則同一個 key 會被當成沒變而略過
+  markPicked(key);
+}
+
+function resetPoints() {
+  pointLayer.clearLayers();
+  markerCache.clear();
+}
+
+async function refreshPoints() {
+  if (isWide()) { resetPoints(); return; }
+
+  const b = map.getBounds();
+  const geo = await api("/api/observations", queryParams({
+    swlat: b.getSouth(), swlng: b.getWest(), nelat: b.getNorth(), nelng: b.getEast(),
+    limit: 2000,
+  }));
+
+  // 先依像素距離分群，視覺上疊在一起的併成一顆標記
+  const zoom = map.getZoom();
+  const groups = new Map();
+  for (const f of geo.features) {
+    const [lng, lat] = f.geometry.coordinates;
+    const key = clusterKey(lat, lng, zoom);
+    let g = groups.get(key);
+    if (!g) {
+      g = { key, lat, lng, items: [] };
+      groups.set(key, g);
+    }
+    g.items.push(f.properties);
+  }
+
+  // 同一群裡日期新的排前面
+  for (const g of groups.values()) {
+    g.items.sort((a, b) => (b.observed_on || "").localeCompare(a.observed_on || ""));
+  }
+
+  for (const [key, g] of groups) {
+    if (markerCache.has(key)) continue;
+
+    const marker = L.marker([g.lat, g.lng], {
+      icon: pinIcon(g, key === pickedKey),
+      riseOnHover: true,
+      // Leaflet 預設照緯度排層級，南邊的會蓋住北邊的。多筆的墊高一層，
+      // 否則旁邊一顆單筆標記就能把它擋住點不到
+      zIndexOffset: g.items.length > 1 ? 1000 : 0,
+    });
+    marker.bindTooltip(tooltipFor(g), { className: "obs-tip", direction: "top", offset: [0, -14] });
+    marker.on("click", () => {
+      markPicked(key);
+      showGroup(g);
+    });
+    marker.addTo(pointLayer);
+    markerCache.set(key, { marker, group: g });
+  }
+
+  for (const [key, entry] of markerCache) {
+    if (groups.has(key)) continue;
+    pointLayer.removeLayer(entry.marker);
+    markerCache.delete(key);
+  }
+
+  applyPendingFocus();
+
+  const stacked = [...groups.values()].filter(g => g.items.length > 1).length;
+  hint(
+    `此範圍 ${geo.features.length} 筆` +
+    (stacked ? `，其中 ${stacked} 處有多筆重疊` : "")
+  );
+}
+
+function tooltipFor(g) {
+  const first = g.items[0];
+  const name = first.name_zh || first.scientific_name;
+  if (g.items.length === 1) {
+    return `${name}<span class="sci">${first.scientific_name}</span>`;
+  }
+  const kinds = new Set(g.items.map(p => p.name_zh || p.scientific_name));
+  return `這裡有 ${g.items.length} 筆<span class="sci">${
+    kinds.size === 1 ? name : `${kinds.size} 個物種`
+  }</span>`;
+}
+
+// 一處只有一筆就直接看詳情，多筆先給清單
+function showGroup(g) {
+  if (g.items.length === 1) { showDetail(g.items[0]); return; }
+
+  openCard({
+    html: `
+      <div class="card-title">這個位置有 ${g.items.length} 筆觀測</div>
+      <div class="card-sci">${new Set(g.items.map(p => p.taxon_key)).size} 個物種　${
+        g.items[0].place_guess || ""
+      }</div>
+      <div class="card-list">
+        ${g.items.map((p, i) => `
+          <button class="card-item" type="button" data-i="${i}">
+            ${p.photo_url
+              ? `<img src="${thumb(p.photo_url)}" alt="" loading="lazy">`
+              : '<span class="noimg"></span>'}
+            <span>
+              <span class="name">${tagsFor(p)}${p.name_zh || p.scientific_name}</span><br>
+              <span class="when">${p.observed_on || ""}</span>
+            </span>
+          </button>`).join("")}
+      </div>`,
+  });
+
+  cardBody.querySelectorAll(".card-item").forEach(btn => {
+    btn.onclick = () => showDetail(
+      g.items[Number(btn.dataset.i)],
+      { label: `回到這 ${g.items.length} 筆`, fn: () => showGroup(g) }
+    );
+  });
+}
+
+// 清單點下去開的是物種卡，一列代表一個物種而非單筆觀測
+async function showTaxonCard(taxonKey) {
+  const d = await api("/api/taxon", {
+    taxon_key: taxonKey, range: state.range, scope: state.scope, recent: 8,
+  });
+  const t = d.taxon;
+  const name = t.name_zh || t.scientific_name;
+  const cover = d.sightings.find(s => s.photo_url);
+  const locked = state.taxon && state.taxon.taxon_key === taxonKey;
+
+  openCard({
+    photo: cover ? cover.photo_url : null,
+    alt: name,
+    html: `
+      ${tagsFor(t) ? `<div class="card-tags">${tagsFor(t)}</div>` : ""}
+      <div class="card-title">${name}</div>
+      <div class="card-sci">${t.scientific_name}</div>
+      <dl class="card-rows">
+        ${row("這段期間", `${d.stats.n.toLocaleString()} 筆　有照片 ${d.stats.with_photo || 0} 筆`)}
+        ${row("出沒縣市", d.counties.length
+          ? (d.counties.length > 6
+              ? `${d.counties.slice(0, 6).join("、")} 等 ${d.counties.length} 個縣市`
+              : d.counties.join("、"))
+          : null)}
+        ${row("最近紀錄", d.stats.last_seen || "－")}
+        ${row("最早紀錄", d.stats.first_seen || "－")}
+        ${row("保育等級", t.protected_status_tw)}
+        ${row("國內紅皮書", t.redlist_tw)}
+        ${row("特有性", t.endemism)}
+        ${row("原生性", t.nativeness)}
+        ${row("科", t.family)}
+        ${row("別名", d.aliases.length ? d.aliases.join("、") : null)}
+      </dl>
+      <div class="card-list">
+        <button class="card-lock" type="button">
+          ${locked ? "取消：地圖只看這個物種" : "在地圖上只看這個物種"}
+        </button>
+        ${d.sightings.slice(0, 6).map((s, i) => `
+          <button class="card-item" type="button" data-i="${i}">
+            ${s.photo_url ? `<img src="${thumb(s.photo_url)}" alt="" loading="lazy">` : '<span class="noimg"></span>'}
+            <span>
+              <span class="name">${s.observed_on || ""}</span><br>
+              <span class="when">${s.place_guess || "地點不詳"}</span>
+            </span>
+          </button>`).join("")}
+      </div>`,
+  });
+
+  cardBody.querySelector(".card-lock").onclick = () => {
+    selectTaxon(locked ? null : { taxon_key: taxonKey, name_zh: t.name_zh });
+    closeCard();
+  };
+
+  // 點某一筆一樣開那筆的資訊卡，物種名要補上，觀測本身沒帶
+  cardBody.querySelectorAll(".card-item").forEach(btn => {
+    btn.onclick = () => showDetail(
+      {
+        ...d.sightings[Number(btn.dataset.i)],
+        name_zh: t.name_zh,
+        scientific_name: t.scientific_name,
+        protected_status_tw: t.protected_status_tw,
+        redlist_tw: t.redlist_tw,
+      },
+      { label: `回到 ${name}`, fn: () => showTaxonCard(taxonKey) }
+    );
+  });
+}
+
+// back 是 { label, fn }，讓「回上一層」能回群組清單，也能回物種卡
+function showDetail(p, back) {
+  const name = p.name_zh || p.scientific_name;
+  openCard({
+    photo: p.photo_url,
+    alt: name,
+    html: `
+      ${back ? `<button class="card-back" type="button">← ${back.label}</button>` : ""}
+      ${tagsFor(p) ? `<div class="card-tags">${tagsFor(p)}</div>` : ""}
+      <div class="card-title">${name}</div>
+      <div class="card-sci">${p.scientific_name || ""}</div>
+      <dl class="card-rows">
+        ${row("警示", p.detail_note)}
+        ${row("觀測日期", p.observed_on)}
+        ${row("地點", p.place_guess)}
+        ${row("觀察者", p.observer)}
+        ${row("鑑定", { research: "研究等級", needs_id: "待鑑定", casual: "一般" }[p.quality_grade] || p.quality_grade)}
+        ${row("位置", p.obscured ? "經模糊化處理" : "")}
+        ${row("來源", sourceLink(p))}
+        ${row("授權", p.photo_attribution || licenseLabel(p.license))}
+      </dl>
+      ${p.lat != null ? '<div class="card-list"><button class="card-goto" type="button">在地圖上顯示這個位置</button></div>' : ""}`,
+  });
+
+  if (back) cardBody.querySelector(".card-back").onclick = back.fn;
+
+  const locate = cardBody.querySelector(".card-goto");
+  if (locate) locate.onclick = () => focusObservation(p);
+}
+
+function hint(text) { document.getElementById("zoomhint").textContent = text; }
+
+async function refreshSummary() {
+  const s = await api("/api/summary", { range: state.range, scope: state.scope, q: state.q || null });
+  document.getElementById("s-obs").textContent = s.observations.toLocaleString();
+  document.getElementById("s-spp").textContent = s.species.toLocaleString();
+  const total = Object.values(s.alerts || {}).reduce((a, b) => a + b, 0);
+  document.getElementById("s-alert").textContent = total.toLocaleString();
+}
+
+async function refreshPanel() {
+  const el = document.getElementById("panel");
+  if (state.tab === "species") {
+    const rows = await api("/api/species", {
+      range: state.range, scope: state.scope, q: state.q || null, limit: 300,
+    });
+    if (!rows.length) {
+      el.innerHTML = state.q
+        ? `<div class="hint">這個期間沒有符合「${state.q}」的物種<br>試試拉長期間或換個範圍</div>`
+        : '<div class="hint">這個期間沒有資料<br>若資料庫剛建立，請先跑回填</div>';
+      return;
+    }
+    el.innerHTML = rows.map(r => `
+      <div class="row${state.taxon && state.taxon.taxon_key === r.taxon_key ? " on" : ""}"
+           data-key="${r.taxon_key}" data-zh="${r.name_zh || ""}">
+        <span class="n">${r.n}</span>
+        <div class="zh">${tagsFor(r)}${r.name_zh || r.scientific_name}</div>
+        <div class="sci">${r.scientific_name}</div>
+        <div class="meta">最近 ${r.last_seen || "－"}</div>
+      </div>`).join("");
+    el.querySelectorAll(".row").forEach(rowEl => {
+      rowEl.onclick = () => showTaxonCard(rowEl.dataset.key);
+    });
+  } else {
+    const rows = await api("/api/alerts", { days: 30, limit: 200 });
+    if (!rows.length) { el.innerHTML = '<div class="hint">近 30 天沒有警示</div>'; return; }
+    const labels = {
+      protected: "保育類", redlist: "受脅", new_in_cell: "網格新記錄",
+      introduced: "外來種", notable: "eBird 罕見",
+    };
+    const cls = {
+      protected: "p1", redlist: "red", new_in_cell: "new",
+      introduced: "alien", notable: "p2",
+    };
+    el.innerHTML = rows.map((r, i) => `
+      <div class="row" data-i="${i}">
+        <div class="zh"><span class="tag ${cls[r.kind] || "p3"}">${labels[r.kind] || r.kind}</span>${r.name_zh || r.scientific_name}</div>
+        <div class="sci">${r.scientific_name}</div>
+        <div class="meta">${r.observed_on || ""}　${r.place_guess || ""}</div>
+      </div>`).join("");
+    // 警示的一列就是一筆觀測，開的是觀測卡，順便把地圖帶過去
+    el.querySelectorAll(".row").forEach(rowEl => {
+      rowEl.onclick = () => {
+        const r = rows[Number(rowEl.dataset.i)];
+        showDetail({
+          ...r,
+          quality_grade: null,
+          detail_note: `${labels[r.kind] || r.kind}　${r.detail || ""}`,
+        });
+      };
+    });
+  }
+}
+
+function selectTaxon(taxon) {
+  state.taxon = taxon && taxon.taxon_key ? taxon : null;
+  refreshAll();
+}
+
+async function refreshAll() {
+  // 篩選條件變了就是換一批資料，舊標記不能沿用
+  resetPoints();
+  await Promise.all([refreshSummary(), refreshPanel(), refreshWide(), refreshPoints()]);
+}
+
+document.querySelectorAll("#range .seg, #scope .seg").forEach(btn => {
+  btn.onclick = () => {
+    const group = btn.parentElement;
+    group.querySelectorAll(".seg").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    state[group.id] = btn.dataset.v;
+    refreshAll();
+  };
+});
+
+document.querySelectorAll(".tabs button").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".tabs button").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    state.tab = btn.dataset.tab;
+    refreshPanel();
+  };
+});
+
+/* ---------- 篩選 ---------- */
+const qInput = document.getElementById("q");
+const clearBtn = document.getElementById("clear-filter");
+let filterTimer = null;
+
+qInput.addEventListener("input", () => {
+  clearTimeout(filterTimer);
+  clearBtn.classList.toggle("on", qInput.value.trim().length > 0);
+  filterTimer = setTimeout(() => {
+    state.q = qInput.value.trim();
+    // 換了篩選字串，先前鎖定的單一物種未必還在結果裡
+    state.taxon = null;
+    refreshAll();
+  }, 300);
+});
+
+clearBtn.onclick = () => {
+  clearTimeout(filterTimer);
+  qInput.value = "";
+  clearBtn.classList.remove("on");
+  qInput.focus();
+  state.q = "";
+  state.taxon = null;
+  refreshAll();
+};
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeCard();
+});
+
+/* ---------- 資料新鮮度 ---------- */
+let lastIngested = null;
+
+function ago(iso) {
+  if (!iso) return "尚無資料";
+  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (diff < 90) return "剛剛";
+  if (diff < 3600) return `${Math.round(diff / 60)} 分鐘前`;
+  if (diff < 86400) return `${Math.round(diff / 3600)} 小時前`;
+  return `${Math.round(diff / 86400)} 天前`;
+}
+
+async function checkFreshness({ autoRefresh = true } = {}) {
+  let s;
+  try {
+    s = await api("/api/status", {});
+  } catch {
+    return;
+  }
+
+  const parts = Object.entries(s.sources || {}).map(
+    ([name, v]) => `${name} ${v.n.toLocaleString()} 筆`
+  );
+  document.getElementById("freshness").innerHTML =
+    `資料更新於 <b>${ago(s.last_ingested)}</b>　${parts.join("　")}`;
+
+  if (autoRefresh && lastIngested && s.last_ingested !== lastIngested) {
+    await refreshAll();
+  }
+  lastIngested = s.last_ingested;
+}
+
+// 問的是自家伺服器，不會碰到 iNat，但後端幾小時才拉一次資料，問太密只是白跑
+setInterval(() => checkFreshness(), 5 * 60000);
+
+map.on("zoomend", async () => {
+  // 網格大小與標記分群都綁在當前 zoom 上，縮放後兩邊都要重算。
+  // refreshWide 一定要呼叫，清掉網格的動作就在它裡面，跳過的話
+  // 放大到點位層級時網格會留在畫面上
+  resetPoints();
+  await refreshWide();
+  await refreshPoints();
+});
+map.on("moveend", refreshPoints);
+
+// 開發時從主控台驅動地圖用
+window.wildmap = { map, state, refreshAll, showGroup, showTaxonCard, markerCache };
+
+refreshAll();
+checkFreshness({ autoRefresh: false });
+</script>
+</body>
+</html>
