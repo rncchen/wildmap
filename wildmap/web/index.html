@@ -152,6 +152,26 @@
     display: flex; flex-direction: column; min-height: 0;
   }
 
+  /* 抽屜握把只在手機版面現身，桌機的側欄不需要收合 */
+  .sheet-handle {
+    display: none; position: relative; width: 100%;
+    align-items: center; justify-content: center; gap: 9px;
+    height: var(--sheet-peek, 56px); padding: 14px 18px 0;
+    background: none; border: none; cursor: pointer; touch-action: none;
+    font-family: inherit; font-size: 15.5px; font-weight: 700;
+    color: var(--animal-text);
+  }
+  .sheet-handle .grip {
+    position: absolute; top: 7px; left: 50%; margin-left: -22px;
+    width: 44px; height: 5px; border-radius: 3px; background: var(--animal-border);
+  }
+  .sheet-handle .chev {
+    flex: 0 0 auto; width: 19px; height: 19px; color: var(--animal-text-muted);
+    transition: transform var(--animal-duration) var(--animal-ease);
+  }
+  aside.open .sheet-handle .chev { transform: rotate(180deg); }
+  .sheet-sum { font-variant-numeric: tabular-nums; }
+
   .stats { display: flex; gap: 10px; padding: 12px 12px 4px; }
   .stats div {
     flex: 1; padding: 9px 6px; background: #fff; text-align: center;
@@ -415,6 +435,92 @@
   }
   .card-close:hover { background: var(--animal-error); border-color: #c04a4a; color: #fff; }
   .card-close:active { transform: translateY(2px); box-shadow: 0 2px 0 0 var(--animal-shadow-btn); }
+
+  /* ---------- 手機版面 ----------
+     螢幕寬度放不下 350px 的側欄，地圖會被壓成一條縫。改成地圖佔滿版，
+     側欄變成疊在地圖上、可收合的底部抽屜 */
+  @media (max-width: 760px) {
+    :root { --sheet-peek: 56px; }
+
+    body { font-size: 16px; }
+
+    header { gap: 7px; padding: 8px 12px; }
+    header h1 { width: 100%; font-size: 20px; gap: 7px; line-height: 1.3; }
+    header h1 span { font-size: 13px; }
+
+    /* 期間與範圍各占一列，窄到放不下時整列改成橫向滑動。
+       下緣留白是給選中膠囊那 4px 立體陰影，捲動容器會把超出的部分裁掉 */
+    .group {
+      width: 100%; gap: 6px; flex-wrap: nowrap; overflow-x: auto;
+      padding: 2px 0 6px; scrollbar-width: none;
+    }
+    .group::-webkit-scrollbar { display: none; }
+    .group > .label { flex: 0 0 auto; font-size: 14px; }
+    button.seg { flex: 0 0 auto; padding: 5px 11px; font-size: 14px; }
+
+    #filter { width: 100%; margin-left: 0; }
+    /* 字級小於 16px 時 iOS Safari 會在聚焦輸入框時自動放大整頁 */
+    #filter input { width: 100%; font-size: 16px; padding: 8px 44px 8px 15px; }
+    #clear-filter { width: 30px; height: 30px; right: 6px; }
+
+    /* 收起的抽屜被推到版面外，不裁掉的話整頁會多出一段可以捲的空白 */
+    main { position: relative; overflow: hidden; }
+    #map { position: absolute; inset: 0; }
+
+    aside {
+      position: absolute; left: 0; right: 0; bottom: 0; z-index: 1100;
+      width: auto; height: 86%; overflow: hidden;
+      border-left: none; border-top: 2px solid var(--animal-border);
+      border-radius: var(--animal-radius-lg) var(--animal-radius-lg) 0 0;
+      box-shadow: 0 -3px 14px rgba(61, 52, 40, .18);
+      transform: translateY(calc(100% - var(--sheet-peek)));
+      transition: transform .3s var(--animal-ease);
+    }
+    aside.open { transform: translateY(0); }
+
+    .sheet-handle { display: flex; }
+    /* 收起時只露出握把，數字改由握把顯示，統計方塊就不必再重複一次 */
+    .stats { display: none; }
+
+    .tabs { padding: 4px 10px 0; }
+    .tabs button { font-size: 16px; padding: 8px 0; }
+    .list { margin: 0 10px 10px; }
+    #freshness { margin: 0 10px 8px; padding: 7px 12px; font-size: 13px; }
+    #credits { padding: 0 12px 12px; font-size: 11.5px; }
+
+    /* 64px 的方鈕在手機上會壓掉半個地圖 */
+    .leaflet-bar a, .leaflet-bar a:first-child, .leaflet-bar a:last-child {
+      width: 48px; height: 48px; line-height: 44px; font-size: 26px;
+      border-radius: var(--animal-radius-sm) !important;
+    }
+    .leaflet-bar a.icon-btn svg { width: 26px; height: 26px; }
+    /* 比例尺與圖資標示要抬到抽屜上方，否則連收起狀態都看不到 */
+    .leaflet-bottom { bottom: var(--sheet-peek); }
+
+    /* left: 50% 讓可用寬度只剩地圖的一半，窄螢幕上文字會提早折行，
+       改成左右撐開再用 auto 邊界置中 */
+    #zoomhint {
+      left: 0; right: 0; margin: 0 auto; width: fit-content; transform: none;
+      bottom: calc(var(--sheet-peek) + 42px);
+      max-width: 88%; padding: 4px 13px; font-size: 13px;
+    }
+
+    #card { padding: 10px; }
+    .card-box { width: 96vw; max-height: 94vh; }
+    .card-photo { max-height: 38vh; }
+    .card-body { padding: 14px 16px 18px; }
+    .card-title { font-size: 22px; }
+    .card-sci { font-size: 16px; }
+    .card-rows div { font-size: 15px; }
+    .card-rows dt { flex-basis: 64px; }
+    .card-close { top: 9px; right: 11px; width: 38px; height: 38px; font-size: 23px; }
+
+    /* 觸控裝置點過的元素會卡在 hover 狀態，浮起與位移的效果在手機上關掉 */
+    button.seg:hover, .leaflet-bar a:hover, .card-item:hover,
+    .card-lock:hover, .card-goto:hover { transform: none; }
+    button.seg.on:hover, .leaflet-bar a:hover,
+    .card-lock:hover, .card-goto:hover { box-shadow: 0 4px 0 0 var(--animal-shadow-btn); }
+  }
 </style>
 </head>
 <body>
@@ -443,7 +549,15 @@
 
 <main>
   <div id="map"><div id="zoomhint"></div></div>
-  <aside>
+  <aside id="sheet">
+    <button class="sheet-handle" type="button" aria-expanded="false" aria-controls="sheet">
+      <span class="grip"></span>
+      <span class="sheet-sum">資料載入中</span>
+      <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M6 15l6-6 6 6"/>
+      </svg>
+    </button>
     <div class="stats">
       <div><b id="s-obs">－</b><span>觀測筆數</span></div>
       <div><b id="s-spp">－</b><span>物種數</span></div>
@@ -481,6 +595,9 @@ const state = {
   tab: "species", q: "", taxon: null,
 };
 const POINT_ZOOM = 11;   // 到這個層級才改用個別點位，再遠就用聚合
+
+// 與 CSS 的 @media 同一個斷點。手機要換的不只有排版，標記大小與抽屜行為也吃它
+const narrow = matchMedia("(max-width: 760px)");
 
 // 地圖上所有圖形都用同一個深棕描邊，靠填色分類別。各自描邊會互相打架，
 // 統一描邊才有動森那種「每個物件都描一圈深色」的感覺
@@ -765,8 +882,9 @@ function clusterKey(lat, lng, zoom) {
   return `${Math.floor(pt.x / CLUSTER_PX)}_${Math.floor(pt.y / CLUSTER_PX)}`;
 }
 
+// 單筆的點用手指按，20px 太小按不準
 function pinSize(n) {
-  return n > 99 ? 40 : n > 1 ? 32 : 20;
+  return n > 99 ? 40 : n > 1 ? 32 : narrow.matches ? 26 : 20;
 }
 
 function pinIcon(group, picked) {
@@ -983,6 +1101,7 @@ async function showTaxonCard(taxonKey) {
   cardBody.querySelector(".card-lock").onclick = () => {
     selectTaxon(locked ? null : { taxon_key: taxonKey, name_zh: t.name_zh });
     closeCard();
+    setSheet(false);   // 鎖定物種是為了看地圖，抽屜擋著就白鎖了
   };
 
   // 點某一筆一樣開那筆的資訊卡，物種名要補上，觀測本身沒帶
@@ -1034,10 +1153,13 @@ function hint(text) { document.getElementById("zoomhint").textContent = text; }
 
 async function refreshSummary() {
   const s = await api("/api/summary", { range: state.range, scope: state.scope, q: state.q || null });
-  document.getElementById("s-obs").textContent = s.observations.toLocaleString();
-  document.getElementById("s-spp").textContent = s.species.toLocaleString();
-  const total = Object.values(s.alerts || {}).reduce((a, b) => a + b, 0);
-  document.getElementById("s-alert").textContent = total.toLocaleString();
+  const obs = s.observations.toLocaleString();
+  const spp = s.species.toLocaleString();
+  const total = Object.values(s.alerts || {}).reduce((a, b) => a + b, 0).toLocaleString();
+  document.getElementById("s-obs").textContent = obs;
+  document.getElementById("s-spp").textContent = spp;
+  document.getElementById("s-alert").textContent = total;
+  sheetSum.textContent = `${obs} 筆　${spp} 種　${total} 警示`;
 }
 
 async function refreshPanel() {
@@ -1152,6 +1274,70 @@ clearBtn.onclick = () => {
 
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") closeCard();
+});
+
+/* ---------- 手機的底部抽屜 ----------
+   窄螢幕地圖佔滿版面，資訊欄收起來疊在上面，只露出握把 */
+const sheet = document.getElementById("sheet");
+const sheetHandle = sheet.querySelector(".sheet-handle");
+const sheetSum = sheet.querySelector(".sheet-sum");
+
+function setSheet(open) {
+  sheet.classList.toggle("open", open);
+  sheetHandle.setAttribute("aria-expanded", String(open));
+}
+
+// 握把上那條橫槓看起來就該能拖，只認點按會讓人以為卡住了
+let sheetDrag = null;
+let dragDecided = false;
+
+sheetHandle.addEventListener("pointerdown", e => {
+  if (!narrow.matches) return;
+  sheetDrag = {
+    y: e.clientY, far: 0,
+    base: sheet.classList.contains("open") ? 0 : sheet.offsetHeight - sheetHandle.offsetHeight,
+  };
+  sheetHandle.setPointerCapture(e.pointerId);
+  sheet.style.transition = "none";
+});
+
+sheetHandle.addEventListener("pointermove", e => {
+  if (!sheetDrag) return;
+  const dy = e.clientY - sheetDrag.y;
+  sheetDrag.far = Math.max(sheetDrag.far, Math.abs(dy));
+  const max = sheet.offsetHeight - sheetHandle.offsetHeight;
+  sheet.style.transform = `translateY(${Math.min(max, Math.max(0, sheetDrag.base + dy))}px)`;
+});
+
+function endSheetDrag(e) {
+  if (!sheetDrag) return;
+  const { y, far } = sheetDrag;
+  sheetDrag = null;
+  sheet.style.transition = "";
+  sheet.style.transform = "";
+  if (far > 14 && e.type === "pointerup") {
+    // 手指放開後瀏覽器還會補一個 click，不擋掉的話剛拖好的狀態馬上被翻回去
+    dragDecided = true;
+    setSheet(e.clientY - y < 0);
+  }
+}
+
+sheetHandle.addEventListener("pointerup", endSheetDrag);
+sheetHandle.addEventListener("pointercancel", endSheetDrag);
+
+sheetHandle.addEventListener("click", () => {
+  if (dragDecided) { dragDecided = false; return; }
+  setSheet(!sheet.classList.contains("open"));
+});
+
+// 開始拖地圖就把抽屜收掉，免得想看的地方被蓋住
+map.on("movestart", () => { if (narrow.matches) setSheet(false); });
+
+// 轉向會跨過斷點，抽屜狀態與標記大小都得跟著換
+narrow.addEventListener("change", () => {
+  setSheet(false);
+  resetPoints();
+  refreshPoints();
 });
 
 /* ---------- 資料新鮮度 ---------- */
